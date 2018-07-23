@@ -724,6 +724,41 @@ class FactorTestCase(BasePipelineTestCase):
             check=partial(check_allclose, atol=0.001),
         )
 
+    def test_fillna_hand_computed(self):
+        """
+        Test the hand-computed example in factor.fillna
+        """
+        f = self.f
+
+        factor_data = array([
+            [nan, 2., 3., nan, nan],
+            [4., nan, 5., 6., nan],
+        ])
+
+        terms = {
+            'filled_1': f.fillna(),
+            'filled_2': f.fillna(5.),
+        }
+
+        expected = {
+            'filled_1': array([
+                [0., 2., 3., 0., 0.],
+                [4., 0., 5., 6., 0.],
+            ]),
+            'filled_2': array([
+                [5., 2., 3., 5., 5.],
+                [4., 5., 5., 6., 5.],
+            ]),
+        }
+        self.check_terms(
+            terms,
+            initial_workspace={
+                f: factor_data,
+            },
+            mask=self.build_mask(self.ones_mask(shape=factor_data.shape)),
+            expected=expected,
+        )
+
     def test_winsorize_hand_computed(self):
         """
         Test the hand-computed example in factor.winsorize.
@@ -1296,6 +1331,10 @@ class ReprTestCase(TestCase):
         r = F().demean().graph_repr()
         self.assertEqual(r, "GroupedRowTransform('demean')")
 
+    def test_fillna(self):
+        r = F().fillna().graph_repr()
+        self.assertEqual(r, "GroupedRowTransform('fillna')")
+
     def test_zscore(self):
         r = F().zscore().graph_repr()
         self.assertEqual(r, "GroupedRowTransform('zscore')")
@@ -1371,6 +1410,11 @@ class TestWindowSafety(TestCase):
 
         for attr in mo.a, mo.b:
             self.assertEqual(attr.window_safe, mo.window_safe)
+
+    def test_fillna_is_window_safe_if_input_is_window_safe(self):
+        self.assertFalse(F().fillna().window_safe)
+        self.assertFalse(F(window_safe=False).fillna().window_safe)
+        self.assertTrue(F(window_safe=True).fillna().window_safe)
 
     def test_demean_is_window_safe_if_input_is_window_safe(self):
         self.assertFalse(F().demean().window_safe)

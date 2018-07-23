@@ -843,6 +843,75 @@ class Factor(RestrictedDTypeMixin, ComputableTerm):
         )
 
     @expect_types(
+        value=(int, float),
+    )
+    @float64_only
+    def fillna(self, value=0., mask=NotSpecified, groupby=NotSpecified):
+        """
+        Construct a new factor that removes NaNs from this factor.
+
+        If ``mask`` is supplied, ignore values where ``mask`` returns False
+        and output NaN anywhere the mask is False.
+
+        If ``groupby`` is supplied, fillna is applied separately
+        separately to each group defined by ``groupby``.
+
+        Parameters
+        ----------
+        value: float, int
+            Value to swap in for NaN's encountered in the array. By default,
+            this method will replace the values with 0.
+
+        Returns
+        -------
+        filled : zipline.pipeline.Factor
+            A Factor producing with NaNs replaced with the paramter "value".
+
+        Examples
+        --------
+        .. code-block:: python
+
+            dollar_volume = AverageDollarVolume(window_length=30)
+
+            high_dollar_volume = dollar_volume.top(10)
+
+            high_volume_sma = SimpleMovingAverage(
+                inputs=[USEquityPricing.close],
+                window_length=10,
+                mask=high_dollar_volume,
+            )
+
+            columns={
+                'HIGH_SMA: high_volume_sma,
+                'FILLED': high_volume_sma.fillna(),
+                'FILL_CUSTOM': high_volume_sma.fillna(5)
+            }
+
+        Given a pipeline with columns, defined above, the result for a
+        given day could look like:
+
+        ::
+
+                    'HIGH_SMA' 'FILLED' 'FILL_CUSTOM'
+            Asset_1    nan        0          5
+            Asset_2     2         2          2
+            Asset_3    nan        0          5
+            Asset_4     3         3          3
+            Asset_5    nan        0          5
+            Asset_6    nan        0          5
+        """
+        return GroupedRowTransform(
+            transform=fillna,
+            transform_args=(value,),
+            factor=self,
+            groupby=groupby,
+            dtype=self.dtype,
+            missing_value=self.missing_value,
+            window_safe=self.window_safe,
+            mask=mask,
+        )
+
+    @expect_types(
         min_percentile=(int, float),
         max_percentile=(int, float),
         mask=(Filter, NotSpecifiedType),
@@ -1665,6 +1734,13 @@ def demean(row):
 
 def zscore(row):
     return (row - nanmean(row)) / nanstd(row)
+
+
+def fillna(row, value):
+    return [
+        value if isnan(d) else d
+        for d in row
+    ]
 
 
 def winsorize(row, min_percentile, max_percentile):
